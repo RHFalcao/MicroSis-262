@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapa interativo da árvore de regressão</title>
+<style>
+:root {
+  --ink:#172033; --muted:#5d687b; --line:#dbe2ec; --paper:#f4f7fb;
+  --panel:#ffffff; --navy:#172b4d; --blue:#2764a5; --blue-soft:#eaf2fc;
+  --green:#16734a; --green-soft:#eaf7f0; --amber:#9a5a08; --amber-soft:#fff5e6;
+  --purple:#6643a5; --purple-soft:#f3effc; --shadow:0 8px 24px rgba(28,45,75,.08);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 22px 60px}
+.hero{background:linear-gradient(120deg,#162949,#2e4d79);color:#fff;border-radius:22px;padding:28px 30px;box-shadow:var(--shadow)}
+.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:#c4d5ef;font-weight:750}
+h1{font-size:clamp(27px,4vw,39px);line-height:1.12;margin:8px 0 10px}
+.hero p{max-width:800px;color:#e2eaf6;margin:0}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:18px 0 26px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:16px;box-shadow:var(--shadow)}
+.stat strong{display:block;font-size:28px;line-height:1.1;color:var(--navy)}.stat span{font-size:13px;color:var(--muted)}
+.section{margin-top:24px}.section h2{font-size:21px;margin:0 0 10px}.section-intro{color:var(--muted);margin:-2px 0 14px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow)}
+.feature-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.feature{border:1px solid var(--line);border-radius:12px;padding:12px;background:#fbfcfe}
+.feature .idx{font-size:11px;color:var(--purple);text-transform:uppercase;letter-spacing:.08em;font-weight:800}
+.feature b{display:block;margin:3px 0}.feature small{color:var(--muted)}
+.callout{margin-top:12px;padding:13px 15px;border-radius:12px;background:var(--blue-soft);color:#214e80;border:1px solid #cfe0f7}
+.toolbar{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin:14px 0}
+button{border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;background:var(--navy);color:#fff}
+button.secondary{background:#e8eef6;color:#263b5b}button:hover{filter:brightness(.97)}
+.search{display:flex;gap:8px;align-items:center;margin-left:auto;flex:1;max-width:360px}
+.search input{min-width:0;flex:1;border:1px solid #cad3df;border-radius:10px;padding:10px 12px;font:inherit;background:#fff}
+#searchMessage{font-size:12px;color:var(--muted);width:100%;text-align:right;min-height:18px}
+.tree-shell{padding:18px;background:#fbfcff;border:1px solid var(--line);border-radius:16px;overflow:auto}
+.tree-root{min-width:300px;max-width:100%}
+details.node{margin:4px 0 8px;border:1px solid #cad7e7;border-radius:12px;background:#fff;overflow:hidden}
+details.node>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:12px 14px;font-weight:750;color:var(--navy)}
+details.node>summary::-webkit-details-marker{display:none}
+details.node>summary:before{content:'+';width:23px;height:23px;display:grid;place-items:center;border-radius:7px;background:#edf2f8;color:var(--blue);font-size:17px;flex:0 0 auto}
+details.node[open]>summary:before{content:'−'}
+.node-id{font-size:11px;letter-spacing:.06em;background:#eaf0f8;color:#314c72;padding:4px 7px;border-radius:6px;white-space:nowrap}
+.condition{font-size:14px;overflow-wrap:anywhere}
+.node-content{padding:0 12px 12px 29px;border-top:1px solid #eef1f6}
+.children{display:grid;grid-template-columns:repeat(2,minmax(240px,1fr));gap:12px;margin-top:12px}
+.branch{min-width:0;border:1px solid var(--line);border-radius:11px;padding:10px;background:#fff}
+.branch-heading{font-size:12px;font-weight:800;border-radius:8px;padding:7px 9px;margin-bottom:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.branch-yes .branch-heading{background:var(--green-soft);color:var(--green)}
+.branch-no .branch-heading{background:var(--amber-soft);color:var(--amber)}
+.branch-heading .route{font-weight:600;opacity:.9}
+.leaf{border:1px solid #b8dfca;border-radius:11px;background:var(--green-soft);padding:13px;margin:5px 0}
+.leaf-top{font-size:11px;letter-spacing:.07em;font-weight:850;color:var(--green)}
+.leaf-value{font-size:23px;font-weight:850;color:#145d3d;margin-top:2px}
+.leaf-note{font-size:12px;color:#47735e}
+.node.highlight>summary{background:#fff4c9;outline:3px solid #e2ae28}
+.leaf.highlight{outline:3px solid #e2ae28}
+.legend{display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:13px;margin:10px 0}
+.legend span{display:inline-flex;align-items:center;gap:6px}.dot{width:9px;height:9px;border-radius:50%;display:inline-block}.yes-dot{background:var(--green)}.no-dot{background:#c17a18}.leaf-dot{background:#4c9a70}
+.table-wrap{overflow:auto;max-height:680px;border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;font-size:13px;background:#fff}
+th,td{padding:9px 10px;border-bottom:1px solid #edf0f4;text-align:left;white-space:nowrap}
+th{position:sticky;top:0;background:#edf2f8;color:#31415a;z-index:1}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+td.precise{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px}
+.tag{display:inline-block;font-size:10px;font-weight:850;letter-spacing:.06em;padding:3px 6px;border-radius:5px}
+.decision-tag{background:var(--blue-soft);color:var(--blue)}.leaf-tag{background:var(--green-soft);color:var(--green)}
+.table-search{width:100%;max-width:300px;margin:0 0 10px;padding:9px 11px;border:1px solid #cad3df;border-radius:9px;font:inherit}
+.logic{background:#101c2f;color:#e9f0fb;border-radius:13px;padding:16px;overflow:auto;font:13px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace}
+.logic .comment{color:#9cb5d8}
+.notes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.note{padding:14px;border-radius:12px;border:1px solid var(--line);background:#fff}.note b{display:block;margin-bottom:4px}.note p{margin:0;color:var(--muted);font-size:13px}
+footer{margin-top:28px;padding-top:14px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}
+@media(max-width:760px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.feature-grid{grid-template-columns:1fr}.children{grid-template-columns:1fr}.notes{grid-template-columns:1fr}.search{margin-left:0;max-width:none;width:100%}.hero{padding:23px 20px}.wrap{padding:16px 12px 40px}}
+@media print{body{background:#fff}.wrap{max-width:none;padding:0}.hero{box-shadow:none;border-radius:0}.stat,.panel{box-shadow:none}.toolbar,.search,#searchMessage{display:none!important}.tree-shell{overflow:visible}.tree-root{max-width:none}.node-content{display:block!important}.children{grid-template-columns:repeat(2,minmax(0,1fr))}details.node:not([open])>.node-content{display:block!important}details.node>summary:before{display:none}.table-wrap{max-height:none;overflow:visible}th{position:static}.section{break-inside:avoid}#allNodes{break-before:page}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div class="eyebrow">Guia visual para a equipe · Python → C → ATmega328P</div>
+    <h1>Mapa interativo da árvore de regressão</h1>
+    <p>Abra os ramos para acompanhar cada comparação. Em cada nó, a árvore testa uma variável; no ramo esquerdo segue quando a condição é verdadeira (≤), no direito quando é falsa (&gt;). As folhas mostram a temperatura estimada.</p>
+  </header>
+
+  <section class="stats" aria-label="Resumo da árvore">
+    <div class="stat"><strong>177</strong><span>nós no total</span></div>
+    <div class="stat"><strong>88</strong><span>nós de decisão</span></div>
+    <div class="stat"><strong>89</strong><span>folhas com previsão</span></div>
+    <div class="stat"><strong>11</strong><span>profundidade máxima</span></div>
+  </section>
+
+  <section class="section">
+    <h2>1. Entradas do modelo</h2>
+    <p class="section-intro">Os índices abaixo são os números usados pela árvore para escolher qual entrada comparar.</p>
+    <div class="feature-grid">
+      <div class="feature"><span class="idx">feature[0]</span><b>Temperatura instantânea</b><small>Temp. Ins. (C) · °C</small></div>
+      <div class="feature"><span class="idx">feature[1]</span><b>Umidade instantânea</b><small>Umi. Ins. (%) · %</small></div>
+      <div class="feature"><span class="idx">feature[2]</span><b>Radiação solar</b><small>Radiacao (KJ/m²) · kJ/m²</small></div>
+    </div>
+    <div class="callout"><b>Saída:</b> Temperaturas alvos, em °C. A folha alcançada contém o valor previsto pelo modelo.</div>
+    <div class="notes" style="margin-top:12px">
+      <div class="note"><b>Critério de divisão</b><p><code>squared_error</code> (redução do erro quadrático / variância dos alvos).</p></div>
+      <div class="note"><b>Configuração registrada</b><p><code>max_depth=None</code>, <code>min_samples_leaf=1</code>, <code>min_samples_split=2</code>, <code>splitter=best</code>.</p></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>2. Explore a árvore</h2>
+    <p class="section-intro">A árvore começa no nó 0. Expanda um nó de decisão para ver os caminhos SIM e NÃO. Você não precisa abrir tudo de uma vez.</p>
+    <div class="legend"><span><i class="dot yes-dot"></i> SIM: entrada ≤ limite</span><span><i class="dot no-dot"></i> NÃO: entrada &gt; limite</span><span><i class="dot leaf-dot"></i> Folha: previsão final</span></div>
+    <div class="toolbar">
+      <button type="button" id="expandAll">Expandir todos os nós</button>
+      <button type="button" class="secondary" id="collapseAll">Recolher árvore</button>
+      <div class="search"><input id="nodeSearch" type="number" min="0" max="176" placeholder="Buscar nó (ex.: 166)"><button type="button" id="searchBtn">Localizar</button></div>
+      <div id="searchMessage" aria-live="polite"></div>
+    </div>
+    <div class="tree-shell"><div id="treeRoot" class="tree-root"></div></div>
+  </section>
+
+  <section class="section">
+    <h2>3. Como transformar a árvore em lógica C</h2>
+    <p class="section-intro">Exemplo real do primeiro nó da árvore. A tabela completa mais abaixo contém os demais 177 nós.</p>
+    <div class="logic"><span class="comment">// Nó 0: feature_index = 1 → umidade instantânea</span><br>
+if (umidade <= 92.5f) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">// seguir para o nó 1</span><br>
+} else {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">// seguir para o nó 124</span><br>
+}</div>
+    <div class="notes" style="margin-top:12px">
+      <div class="note"><b>Nó de decisão</b><p>Leia a entrada indicada por feature_index, compare com limite e escolha filho_esquerdo (≤) ou filho_direito (&gt;).</p></div>
+      <div class="note"><b>Folha</b><p>Quando chegar a uma folha, retorne previsao como temperatura estimada em °C. Não faça outra comparação.</p></div>
+      <div class="note"><b>IDs dos nós</b><p>Os números dos nós são identificadores para navegar na árvore. Não representam a ordem dos sensores nem a ordem de execução no código.</p></div>
+      <div class="note"><b>Precisão numérica</b><p>Não arredonde limites ou previsões ao implementar. Use os valores completos da tabela/CSV para manter o comportamento próximo ao modelo Python.</p></div>
+    </div>
+  </section>
+
+  <section class="section" id="allNodes">
+    <h2>4. Tabela completa dos nós</h2>
+    <p class="section-intro">Referência rápida para programar. Os limites e previsões aparecem com a precisão exportada no CSV.</p>
+    <input class="table-search" id="tableSearch" type="search" placeholder="Filtrar por número, variável ou tipo...">
+    <div class="table-wrap">
+      <table id="nodesTable">
+        <thead><tr><th>Nó</th><th>Tipo</th><th>feature_index</th><th>Variável consultada</th><th>Limite da comparação</th><th>Filho SIM (≤)</th><th>Filho NÃO (&gt;)</th><th>Previsão da folha</th></tr></thead>
+        <tbody><tr><td class="num">0</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">1</td><td>Umidade instantânea (%)</td><td class="num precise">92.5</td><td class="num">1</td><td class="num">124</td><td>—</td></tr>
+<tr><td class="num">1</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">24.550000190734863</td><td class="num">2</td><td class="num">47</td><td>—</td></tr>
+<tr><td class="num">2</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">1</td><td>Umidade instantânea (%)</td><td class="num precise">90.5</td><td class="num">3</td><td class="num">38</td><td>—</td></tr>
+<tr><td class="num">3</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">23.5</td><td class="num">4</td><td class="num">11</td><td>—</td></tr>
+<tr><td class="num">4</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">23.100000381469727</td><td class="num">5</td><td class="num">8</td><td>—</td></tr>
+<tr><td class="num">5</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">22.899999618530277</td><td class="num">6</td><td class="num">7</td><td>—</td></tr>
+<tr><td class="num">6</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">23.800000000000001 °C</td></tr>
+<tr><td class="num">7</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">23.699999999999999 °C</td></tr>
+<tr><td class="num">8</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">1</td><td>Umidade instantânea (%)</td><td class="num precise">88</td><td class="num">9</td><td class="num">10</td><td>—</td></tr>
+<tr><td class="num">9</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">23.5 °C</td></tr>
+<tr><td class="num">10</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">23.600000000000001 °C</td></tr>
+<tr><td class="num">11</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">1</td><td>Umidade instantânea (%)</td><td class="num precise">86.5</td><td class="num">12</td><td class="num">29</td><td>—</td></tr>
+<tr><td class="num">12</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">1</td><td>Umidade instantânea (%)</td><td class="num precise">82</td><td class="num">13</td><td class="num">14</td><td>—</td></tr>
+<tr><td class="num">13</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">25.300000000000001 °C</td></tr>
+<tr><td class="num">14</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">24.050000190734863</td><td class="num">15</td><td class="num">16</td><td>—</td></tr>
+<tr><td class="num">15</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">23.399999999999999 °C</td></tr>
+<tr><td class="num">16</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">24.34999942779541</td><td class="num">17</td><td class="num">24</td><td>—</td></tr>
+<tr><td class="num">17</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">1</td><td>Umidade instantânea (%)</td><td class="num precise">84.5</td><td class="num">18</td><td class="num">19</td><td>—</td></tr>
+<tr><td class="num">18</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">23.300000000000001 °C</td></tr>
+<tr><td class="num">19</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">24.25</td><td class="num">20</td><td class="num">21</td><td>—</td></tr>
+<tr><td class="num">20</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">25.600000000000001 °C</td></tr>
+<tr><td class="num">21</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">1</td><td>Umidade instantânea (%)</td><td class="num precise">85.5</td><td class="num">22</td><td class="num">23</td><td>—</td></tr>
+<tr><td class="num">22</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">25.5 °C</td></tr>
+<tr><td class="num">23</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">23.199999999999999 °C</td></tr>
+<tr><td class="num">24</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">24.449999809265137</td><td class="num">25</td><td class="num">26</td><td>—</td></tr>
+<tr><td class="num">25</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">23 °C</td></tr>
+<tr><td class="num">26</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">1</td><td>Umidade instantânea (%)</td><td class="num precise">84</td><td class="num">27</td><td class="num">28</td><td>—</td></tr>
+<tr><td class="num">27</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">25.399999999999999 °C</td></tr>
+<tr><td class="num">28</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">23.100000000000001 °C</td></tr>
+<tr><td class="num">29</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">2</td><td>Radiação solar (kJ/m²)</td><td class="num precise">195.79999542236328</td><td class="num">30</td><td class="num">37</td><td>—</td></tr>
+<tr><td class="num">30</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">1</td><td>Umidade instantânea (%)</td><td class="num precise">88.5</td><td class="num">31</td><td class="num">34</td><td>—</td></tr>
+<tr><td class="num">31</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">1</td><td>Umidade instantânea (%)</td><td class="num precise">87.5</td><td class="num">32</td><td class="num">33</td><td>—</td></tr>
+<tr><td class="num">32</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">25.699999999999999 °C</td></tr>
+<tr><td class="num">33</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">25.800000000000001 °C</td></tr>
+<tr><td class="num">34</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">1</td><td>Umidade instantânea (%)</td><td class="num precise">89.5</td><td class="num">35</td><td class="num">36</td><td>—</td></tr>
+<tr><td class="num">35</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">26.399999999999999 °C</td></tr>
+<tr><td class="num">36</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">26.100000000000001 °C</td></tr>
+<tr><td class="num">37</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">24 °C</td></tr>
+<tr><td class="num">38</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">23</td><td class="num">39</td><td class="num">40</td><td>—</td></tr>
+<tr><td class="num">39</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">23.899999999999999 °C</td></tr>
+<tr><td class="num">40</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">23.399999618530277</td><td class="num">41</td><td class="num">42</td><td>—</td></tr>
+<tr><td class="num">41</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">25.899999999999999 °C</td></tr>
+<tr><td class="num">42</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">2</td><td>Radiação solar (kJ/m²)</td><td class="num precise">4.0999999046325684</td><td class="num">43</td><td class="num">46</td><td>—</td></tr>
+<tr><td class="num">43</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">23.600000381469727</td><td class="num">44</td><td class="num">45</td><td>—</td></tr>
+<tr><td class="num">44</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">26 °C</td></tr>
+<tr><td class="num">45</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">26.199999999999999 °C</td></tr>
+<tr><td class="num">46</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">26.300000000000001 °C</td></tr>
+<tr><td class="num">47</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">1</td><td>Umidade instantânea (%)</td><td class="num precise">84.5</td><td class="num">48</td><td class="num">103</td><td>—</td></tr>
+<tr><td class="num">48</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">26.850000381469727</td><td class="num">49</td><td class="num">74</td><td>—</td></tr>
+<tr><td class="num">49</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">1</td><td>Umidade instantânea (%)</td><td class="num precise">82.5</td><td class="num">50</td><td class="num">67</td><td>—</td></tr>
+<tr><td class="num">50</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">2</td><td>Radiação solar (kJ/m²)</td><td class="num precise">863.6500244140625</td><td class="num">51</td><td class="num">62</td><td>—</td></tr>
+<tr><td class="num">51</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">2</td><td>Radiação solar (kJ/m²)</td><td class="num precise">797.9000244140625</td><td class="num">52</td><td class="num">61</td><td>—</td></tr>
+<tr><td class="num">52</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">2</td><td>Radiação solar (kJ/m²)</td><td class="num precise">473.89999389648438</td><td class="num">53</td><td class="num">58</td><td>—</td></tr>
+<tr><td class="num">53</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">25.049999237060547</td><td class="num">54</td><td class="num">57</td><td>—</td></tr>
+<tr><td class="num">54</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">24.699999809265137</td><td class="num">55</td><td class="num">56</td><td>—</td></tr>
+<tr><td class="num">55</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">25.100000000000001 °C</td></tr>
+<tr><td class="num">56</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">25.199999999999999 °C</td></tr>
+<tr><td class="num">57</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">25 °C</td></tr>
+<tr><td class="num">58</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">25.399999618530277</td><td class="num">59</td><td class="num">60</td><td>—</td></tr>
+<tr><td class="num">59</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">24.300000000000001 °C</td></tr>
+<tr><td class="num">60</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">24.199999999999999 °C</td></tr>
+<tr><td class="num">61</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">26.5 °C</td></tr>
+<tr><td class="num">62</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">26.5</td><td class="num">63</td><td class="num">66</td><td>—</td></tr>
+<tr><td class="num">63</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">2</td><td>Radiação solar (kJ/m²)</td><td class="num precise">949.35000610351562</td><td class="num">64</td><td class="num">65</td><td>—</td></tr>
+<tr><td class="num">64</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">24.100000000000001 °C</td></tr>
+<tr><td class="num">65</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">24.399999999999999 °C</td></tr>
+<tr><td class="num">66</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">24.899999999999999 °C</td></tr>
+<tr><td class="num">67</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">25.550000190734863</td><td class="num">68</td><td class="num">71</td><td>—</td></tr>
+<tr><td class="num">68</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">25.449999809265137</td><td class="num">69</td><td class="num">70</td><td>—</td></tr>
+<tr><td class="num">69</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">27.800000000000001 °C</td></tr>
+<tr><td class="num">70</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">27.699999999999999 °C</td></tr>
+<tr><td class="num">71</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">25.90000057220459</td><td class="num">72</td><td class="num">73</td><td>—</td></tr>
+<tr><td class="num">72</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">27.5 °C</td></tr>
+<tr><td class="num">73</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">27.399999999999999 °C</td></tr>
+<tr><td class="num">74</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">1</td><td>Umidade instantânea (%)</td><td class="num precise">75</td><td class="num">75</td><td class="num">92</td><td>—</td></tr>
+<tr><td class="num">75</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">1</td><td>Umidade instantânea (%)</td><td class="num precise">64.5</td><td class="num">76</td><td class="num">81</td><td>—</td></tr>
+<tr><td class="num">76</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">1</td><td>Umidade instantânea (%)</td><td class="num precise">63</td><td class="num">77</td><td class="num">80</td><td>—</td></tr>
+<tr><td class="num">77</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">2</td><td>Radiação solar (kJ/m²)</td><td class="num precise">2315.5</td><td class="num">78</td><td class="num">79</td><td>—</td></tr>
+<tr><td class="num">78</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">24.600000000000001 °C</td></tr>
+<tr><td class="num">79</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">24.699999999999999 °C</td></tr>
+<tr><td class="num">80</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">24.800000000000001 °C</td></tr>
+<tr><td class="num">81</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">27.5</td><td class="num">82</td><td class="num">83</td><td>—</td></tr>
+<tr><td class="num">82</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">24.5 °C</td></tr>
+<tr><td class="num">83</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">2</td><td>Radiação solar (kJ/m²)</td><td class="num precise">1036.6499633789062</td><td class="num">84</td><td class="num">85</td><td>—</td></tr>
+<tr><td class="num">84</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">27.100000000000001 °C</td></tr>
+<tr><td class="num">85</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">28.050000190734863</td><td class="num">86</td><td class="num">87</td><td>—</td></tr>
+<tr><td class="num">86</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">26.699999999999999 °C</td></tr>
+<tr><td class="num">87</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">2</td><td>Radiação solar (kJ/m²)</td><td class="num precise">1600.25</td><td class="num">88</td><td class="num">89</td><td>—</td></tr>
+<tr><td class="num">88</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">27 °C</td></tr>
+<tr><td class="num">89</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">1</td><td>Umidade instantânea (%)</td><td class="num precise">68.5</td><td class="num">90</td><td class="num">91</td><td>—</td></tr>
+<tr><td class="num">90</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">26.800000000000001 °C</td></tr>
+<tr><td class="num">91</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">26.899999999999999 °C</td></tr>
+<tr><td class="num">92</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">2</td><td>Radiação solar (kJ/m²)</td><td class="num precise">1272</td><td class="num">93</td><td class="num">98</td><td>—</td></tr>
+<tr><td class="num">93</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">27.449999809265137</td><td class="num">94</td><td class="num">95</td><td>—</td></tr>
+<tr><td class="num">94</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">26.600000000000001 °C</td></tr>
+<tr><td class="num">95</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">2</td><td>Radiação solar (kJ/m²)</td><td class="num precise">991.79998779296875</td><td class="num">96</td><td class="num">97</td><td>—</td></tr>
+<tr><td class="num">96</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">27.300000000000001 °C</td></tr>
+<tr><td class="num">97</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">27.199999999999999 °C</td></tr>
+<tr><td class="num">98</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">1</td><td>Umidade instantânea (%)</td><td class="num precise">80</td><td class="num">99</td><td class="num">102</td><td>—</td></tr>
+<tr><td class="num">99</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">27.300000190734863</td><td class="num">100</td><td class="num">101</td><td>—</td></tr>
+<tr><td class="num">100</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">32 °C</td></tr>
+<tr><td class="num">101</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">31.899999999999999 °C</td></tr>
+<tr><td class="num">102</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">29.199999999999999 °C</td></tr>
+<tr><td class="num">103</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">2</td><td>Radiação solar (kJ/m²)</td><td class="num precise">455.60000610351562</td><td class="num">104</td><td class="num">117</td><td>—</td></tr>
+<tr><td class="num">104</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">25.25</td><td class="num">105</td><td class="num">112</td><td>—</td></tr>
+<tr><td class="num">105</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">24.800000190734863</td><td class="num">106</td><td class="num">109</td><td>—</td></tr>
+<tr><td class="num">106</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">1</td><td>Umidade instantânea (%)</td><td class="num precise">91.5</td><td class="num">107</td><td class="num">108</td><td>—</td></tr>
+<tr><td class="num">107</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">28.300000000000001 °C</td></tr>
+<tr><td class="num">108</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">28.399999999999999 °C</td></tr>
+<tr><td class="num">109</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">25.100000381469727</td><td class="num">110</td><td class="num">111</td><td>—</td></tr>
+<tr><td class="num">110</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">28.199999999999999 °C</td></tr>
+<tr><td class="num">111</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">28.100000000000001 °C</td></tr>
+<tr><td class="num">112</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">1</td><td>Umidade instantânea (%)</td><td class="num precise">85.5</td><td class="num">113</td><td class="num">114</td><td>—</td></tr>
+<tr><td class="num">113</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">27.600000000000001 °C</td></tr>
+<tr><td class="num">114</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">1</td><td>Umidade instantânea (%)</td><td class="num precise">86.5</td><td class="num">115</td><td class="num">116</td><td>—</td></tr>
+<tr><td class="num">115</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">27.899999999999999 °C</td></tr>
+<tr><td class="num">116</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">28 °C</td></tr>
+<tr><td class="num">117</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">27.40000057220459</td><td class="num">118</td><td class="num">123</td><td>—</td></tr>
+<tr><td class="num">118</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">1</td><td>Umidade instantânea (%)</td><td class="num precise">85.5</td><td class="num">119</td><td class="num">120</td><td>—</td></tr>
+<tr><td class="num">119</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">31.800000000000001 °C</td></tr>
+<tr><td class="num">120</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">2</td><td>Radiação solar (kJ/m²)</td><td class="num precise">1770.300048828125</td><td class="num">121</td><td class="num">122</td><td>—</td></tr>
+<tr><td class="num">121</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">31.699999999999999 °C</td></tr>
+<tr><td class="num">122</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">31.600000000000001 °C</td></tr>
+<tr><td class="num">123</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">29.100000000000001 °C</td></tr>
+<tr><td class="num">124</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">1</td><td>Umidade instantânea (%)</td><td class="num precise">96.5</td><td class="num">125</td><td class="num">152</td><td>—</td></tr>
+<tr><td class="num">125</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">2</td><td>Radiação solar (kJ/m²)</td><td class="num precise">696.89999389648438</td><td class="num">126</td><td class="num">145</td><td>—</td></tr>
+<tr><td class="num">126</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">2</td><td>Radiação solar (kJ/m²)</td><td class="num precise">62.349999904632568</td><td class="num">127</td><td class="num">132</td><td>—</td></tr>
+<tr><td class="num">127</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">2</td><td>Radiação solar (kJ/m²)</td><td class="num precise">6.3499999046325684</td><td class="num">128</td><td class="num">131</td><td>—</td></tr>
+<tr><td class="num">128</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">1</td><td>Umidade instantânea (%)</td><td class="num precise">94.5</td><td class="num">129</td><td class="num">130</td><td>—</td></tr>
+<tr><td class="num">129</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">28.5 °C</td></tr>
+<tr><td class="num">130</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">28.600000000000001 °C</td></tr>
+<tr><td class="num">131</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">28.699999999999999 °C</td></tr>
+<tr><td class="num">132</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">24.350000381469727</td><td class="num">133</td><td class="num">136</td><td>—</td></tr>
+<tr><td class="num">133</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">2</td><td>Radiação solar (kJ/m²)</td><td class="num precise">184.5</td><td class="num">134</td><td class="num">135</td><td>—</td></tr>
+<tr><td class="num">134</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">29.800000000000001 °C</td></tr>
+<tr><td class="num">135</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">29.699999999999999 °C</td></tr>
+<tr><td class="num">136</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">2</td><td>Radiação solar (kJ/m²)</td><td class="num precise">522.75</td><td class="num">137</td><td class="num">140</td><td>—</td></tr>
+<tr><td class="num">137</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">24.65000057220459</td><td class="num">138</td><td class="num">139</td><td>—</td></tr>
+<tr><td class="num">138</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">28.899999999999999 °C</td></tr>
+<tr><td class="num">139</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">28.800000000000001 °C</td></tr>
+<tr><td class="num">140</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">2</td><td>Radiação solar (kJ/m²)</td><td class="num precise">671.44998168945312</td><td class="num">141</td><td class="num">144</td><td>—</td></tr>
+<tr><td class="num">141</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">2</td><td>Radiação solar (kJ/m²)</td><td class="num precise">630.14999389648438</td><td class="num">142</td><td class="num">143</td><td>—</td></tr>
+<tr><td class="num">142</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">29.600000000000001 °C</td></tr>
+<tr><td class="num">143</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">29.399999999999999 °C</td></tr>
+<tr><td class="num">144</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">29 °C</td></tr>
+<tr><td class="num">145</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">1</td><td>Umidade instantânea (%)</td><td class="num precise">93.5</td><td class="num">146</td><td class="num">147</td><td>—</td></tr>
+<tr><td class="num">146</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">29.300000000000001 °C</td></tr>
+<tr><td class="num">147</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">25.449999809265137</td><td class="num">148</td><td class="num">151</td><td>—</td></tr>
+<tr><td class="num">148</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">25</td><td class="num">149</td><td class="num">150</td><td>—</td></tr>
+<tr><td class="num">149</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">31.5 °C</td></tr>
+<tr><td class="num">150</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">31.399999999999999 °C</td></tr>
+<tr><td class="num">151</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">29.5 °C</td></tr>
+<tr><td class="num">152</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">2</td><td>Radiação solar (kJ/m²)</td><td class="num precise">9.2500002384185809</td><td class="num">153</td><td class="num">172</td><td>—</td></tr>
+<tr><td class="num">153</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">23.65000057220459</td><td class="num">154</td><td class="num">163</td><td>—</td></tr>
+<tr><td class="num">154</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">22.90000057220459</td><td class="num">155</td><td class="num">158</td><td>—</td></tr>
+<tr><td class="num">155</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">22.65000057220459</td><td class="num">156</td><td class="num">157</td><td>—</td></tr>
+<tr><td class="num">156</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">30.899999999999999 °C</td></tr>
+<tr><td class="num">157</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">31 °C</td></tr>
+<tr><td class="num">158</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">23.199999809265137</td><td class="num">159</td><td class="num">160</td><td>—</td></tr>
+<tr><td class="num">159</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">30.800000000000001 °C</td></tr>
+<tr><td class="num">160</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">23.449999809265137</td><td class="num">161</td><td class="num">162</td><td>—</td></tr>
+<tr><td class="num">161</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">30.699999999999999 °C</td></tr>
+<tr><td class="num">162</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">30.600000000000001 °C</td></tr>
+<tr><td class="num">163</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">2</td><td>Radiação solar (kJ/m²)</td><td class="num precise">3.4500000476837158</td><td class="num">164</td><td class="num">171</td><td>—</td></tr>
+<tr><td class="num">164</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">23.84999942779541</td><td class="num">165</td><td class="num">168</td><td>—</td></tr>
+<tr><td class="num">165</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">23.75</td><td class="num">166</td><td class="num">167</td><td>—</td></tr>
+<tr><td class="num">166</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">30.25 °C</td></tr>
+<tr><td class="num">167</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">30.350000000000001 °C</td></tr>
+<tr><td class="num">168</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">23.949999809265137</td><td class="num">169</td><td class="num">170</td><td>—</td></tr>
+<tr><td class="num">169</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">30.100000000000001 °C</td></tr>
+<tr><td class="num">170</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">30.199999999999999 °C</td></tr>
+<tr><td class="num">171</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">29.899999999999999 °C</td></tr>
+<tr><td class="num">172</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">23.15000057220459</td><td class="num">173</td><td class="num">174</td><td>—</td></tr>
+<tr><td class="num">173</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">31.100000000000001 °C</td></tr>
+<tr><td class="num">174</td><td><span class="tag decision-tag">DECISÃO</span></td><td class="num">0</td><td>Temperatura instantânea (°C)</td><td class="num precise">24.300000190734863</td><td class="num">175</td><td class="num">176</td><td>—</td></tr>
+<tr><td class="num">175</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">31.199999999999999 °C</td></tr>
+<tr><td class="num">176</td><td><span class="tag leaf-tag">FOLHA</span></td><td class="num">-2</td><td>—</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num precise">31.300000000000001 °C</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>Mapa gerado a partir de estrutura_arvore.csv. Estrutura verificada: todos os 177 nós são alcançáveis a partir do nó 0; 88 decisões e 89 folhas. Este mapa documenta o modelo exportado; valide a versão final e compare as previsões Python/C antes de gravar o firmware no microcontrolador.</footer>
+</div>
+<script>
+const NODES = {"0":{"id":0,"type":"decisao","feature":"Umi. Ins. (%)","feature_index":1,"threshold":92.5,"left":1,"right":124,"prediction":null},"1":{"id":1,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":24.550000190734863,"left":2,"right":47,"prediction":null},"2":{"id":2,"type":"decisao","feature":"Umi. Ins. (%)","feature_index":1,"threshold":90.5,"left":3,"right":38,"prediction":null},"3":{"id":3,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":23.5,"left":4,"right":11,"prediction":null},"4":{"id":4,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":23.100000381469727,"left":5,"right":8,"prediction":null},"5":{"id":5,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":22.899999618530277,"left":6,"right":7,"prediction":null},"6":{"id":6,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":23.8},"7":{"id":7,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":23.7},"8":{"id":8,"type":"decisao","feature":"Umi. Ins. (%)","feature_index":1,"threshold":88.0,"left":9,"right":10,"prediction":null},"9":{"id":9,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":23.5},"10":{"id":10,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":23.6},"11":{"id":11,"type":"decisao","feature":"Umi. Ins. (%)","feature_index":1,"threshold":86.5,"left":12,"right":29,"prediction":null},"12":{"id":12,"type":"decisao","feature":"Umi. Ins. (%)","feature_index":1,"threshold":82.0,"left":13,"right":14,"prediction":null},"13":{"id":13,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":25.3},"14":{"id":14,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":24.050000190734863,"left":15,"right":16,"prediction":null},"15":{"id":15,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":23.4},"16":{"id":16,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":24.34999942779541,"left":17,"right":24,"prediction":null},"17":{"id":17,"type":"decisao","feature":"Umi. Ins. (%)","feature_index":1,"threshold":84.5,"left":18,"right":19,"prediction":null},"18":{"id":18,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":23.3},"19":{"id":19,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":24.25,"left":20,"right":21,"prediction":null},"20":{"id":20,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":25.6},"21":{"id":21,"type":"decisao","feature":"Umi. Ins. (%)","feature_index":1,"threshold":85.5,"left":22,"right":23,"prediction":null},"22":{"id":22,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":25.5},"23":{"id":23,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":23.2},"24":{"id":24,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":24.449999809265137,"left":25,"right":26,"prediction":null},"25":{"id":25,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":23.0},"26":{"id":26,"type":"decisao","feature":"Umi. Ins. (%)","feature_index":1,"threshold":84.0,"left":27,"right":28,"prediction":null},"27":{"id":27,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":25.4},"28":{"id":28,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":23.1},"29":{"id":29,"type":"decisao","feature":"Radiacao (KJ/m²)","feature_index":2,"threshold":195.79999542236328,"left":30,"right":37,"prediction":null},"30":{"id":30,"type":"decisao","feature":"Umi. Ins. (%)","feature_index":1,"threshold":88.5,"left":31,"right":34,"prediction":null},"31":{"id":31,"type":"decisao","feature":"Umi. Ins. (%)","feature_index":1,"threshold":87.5,"left":32,"right":33,"prediction":null},"32":{"id":32,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":25.7},"33":{"id":33,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":25.8},"34":{"id":34,"type":"decisao","feature":"Umi. Ins. (%)","feature_index":1,"threshold":89.5,"left":35,"right":36,"prediction":null},"35":{"id":35,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":26.4},"36":{"id":36,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":26.1},"37":{"id":37,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":24.0},"38":{"id":38,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":23.0,"left":39,"right":40,"prediction":null},"39":{"id":39,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":23.9},"40":{"id":40,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":23.399999618530277,"left":41,"right":42,"prediction":null},"41":{"id":41,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":25.9},"42":{"id":42,"type":"decisao","feature":"Radiacao (KJ/m²)","feature_index":2,"threshold":4.099999904632568,"left":43,"right":46,"prediction":null},"43":{"id":43,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":23.600000381469727,"left":44,"right":45,"prediction":null},"44":{"id":44,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":26.0},"45":{"id":45,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":26.2},"46":{"id":46,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":26.3},"47":{"id":47,"type":"decisao","feature":"Umi. Ins. (%)","feature_index":1,"threshold":84.5,"left":48,"right":103,"prediction":null},"48":{"id":48,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":26.850000381469727,"left":49,"right":74,"prediction":null},"49":{"id":49,"type":"decisao","feature":"Umi. Ins. (%)","feature_index":1,"threshold":82.5,"left":50,"right":67,"prediction":null},"50":{"id":50,"type":"decisao","feature":"Radiacao (KJ/m²)","feature_index":2,"threshold":863.6500244140625,"left":51,"right":62,"prediction":null},"51":{"id":51,"type":"decisao","feature":"Radiacao (KJ/m²)","feature_index":2,"threshold":797.9000244140625,"left":52,"right":61,"prediction":null},"52":{"id":52,"type":"decisao","feature":"Radiacao (KJ/m²)","feature_index":2,"threshold":473.8999938964844,"left":53,"right":58,"prediction":null},"53":{"id":53,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":25.049999237060547,"left":54,"right":57,"prediction":null},"54":{"id":54,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":24.699999809265137,"left":55,"right":56,"prediction":null},"55":{"id":55,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":25.1},"56":{"id":56,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":25.2},"57":{"id":57,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":25.0},"58":{"id":58,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":25.399999618530277,"left":59,"right":60,"prediction":null},"59":{"id":59,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":24.3},"60":{"id":60,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":24.2},"61":{"id":61,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":26.5},"62":{"id":62,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":26.5,"left":63,"right":66,"prediction":null},"63":{"id":63,"type":"decisao","feature":"Radiacao (KJ/m²)","feature_index":2,"threshold":949.3500061035156,"left":64,"right":65,"prediction":null},"64":{"id":64,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":24.1},"65":{"id":65,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":24.4},"66":{"id":66,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":24.9},"67":{"id":67,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":25.550000190734863,"left":68,"right":71,"prediction":null},"68":{"id":68,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":25.449999809265137,"left":69,"right":70,"prediction":null},"69":{"id":69,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":27.8},"70":{"id":70,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":27.7},"71":{"id":71,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":25.90000057220459,"left":72,"right":73,"prediction":null},"72":{"id":72,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":27.5},"73":{"id":73,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":27.4},"74":{"id":74,"type":"decisao","feature":"Umi. Ins. (%)","feature_index":1,"threshold":75.0,"left":75,"right":92,"prediction":null},"75":{"id":75,"type":"decisao","feature":"Umi. Ins. (%)","feature_index":1,"threshold":64.5,"left":76,"right":81,"prediction":null},"76":{"id":76,"type":"decisao","feature":"Umi. Ins. (%)","feature_index":1,"threshold":63.0,"left":77,"right":80,"prediction":null},"77":{"id":77,"type":"decisao","feature":"Radiacao (KJ/m²)","feature_index":2,"threshold":2315.5,"left":78,"right":79,"prediction":null},"78":{"id":78,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":24.6},"79":{"id":79,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":24.7},"80":{"id":80,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":24.8},"81":{"id":81,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":27.5,"left":82,"right":83,"prediction":null},"82":{"id":82,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":24.5},"83":{"id":83,"type":"decisao","feature":"Radiacao (KJ/m²)","feature_index":2,"threshold":1036.6499633789062,"left":84,"right":85,"prediction":null},"84":{"id":84,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":27.1},"85":{"id":85,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":28.050000190734863,"left":86,"right":87,"prediction":null},"86":{"id":86,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":26.7},"87":{"id":87,"type":"decisao","feature":"Radiacao (KJ/m²)","feature_index":2,"threshold":1600.25,"left":88,"right":89,"prediction":null},"88":{"id":88,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":27.0},"89":{"id":89,"type":"decisao","feature":"Umi. Ins. (%)","feature_index":1,"threshold":68.5,"left":90,"right":91,"prediction":null},"90":{"id":90,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":26.8},"91":{"id":91,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":26.9},"92":{"id":92,"type":"decisao","feature":"Radiacao (KJ/m²)","feature_index":2,"threshold":1272.0,"left":93,"right":98,"prediction":null},"93":{"id":93,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":27.449999809265137,"left":94,"right":95,"prediction":null},"94":{"id":94,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":26.6},"95":{"id":95,"type":"decisao","feature":"Radiacao (KJ/m²)","feature_index":2,"threshold":991.7999877929688,"left":96,"right":97,"prediction":null},"96":{"id":96,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":27.3},"97":{"id":97,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":27.2},"98":{"id":98,"type":"decisao","feature":"Umi. Ins. (%)","feature_index":1,"threshold":80.0,"left":99,"right":102,"prediction":null},"99":{"id":99,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":27.300000190734863,"left":100,"right":101,"prediction":null},"100":{"id":100,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":32.0},"101":{"id":101,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":31.9},"102":{"id":102,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":29.2},"103":{"id":103,"type":"decisao","feature":"Radiacao (KJ/m²)","feature_index":2,"threshold":455.6000061035156,"left":104,"right":117,"prediction":null},"104":{"id":104,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":25.25,"left":105,"right":112,"prediction":null},"105":{"id":105,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":24.800000190734863,"left":106,"right":109,"prediction":null},"106":{"id":106,"type":"decisao","feature":"Umi. Ins. (%)","feature_index":1,"threshold":91.5,"left":107,"right":108,"prediction":null},"107":{"id":107,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":28.3},"108":{"id":108,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":28.4},"109":{"id":109,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":25.100000381469727,"left":110,"right":111,"prediction":null},"110":{"id":110,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":28.2},"111":{"id":111,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":28.1},"112":{"id":112,"type":"decisao","feature":"Umi. Ins. (%)","feature_index":1,"threshold":85.5,"left":113,"right":114,"prediction":null},"113":{"id":113,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":27.6},"114":{"id":114,"type":"decisao","feature":"Umi. Ins. (%)","feature_index":1,"threshold":86.5,"left":115,"right":116,"prediction":null},"115":{"id":115,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":27.9},"116":{"id":116,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":28.0},"117":{"id":117,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":27.40000057220459,"left":118,"right":123,"prediction":null},"118":{"id":118,"type":"decisao","feature":"Umi. Ins. (%)","feature_index":1,"threshold":85.5,"left":119,"right":120,"prediction":null},"119":{"id":119,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":31.8},"120":{"id":120,"type":"decisao","feature":"Radiacao (KJ/m²)","feature_index":2,"threshold":1770.300048828125,"left":121,"right":122,"prediction":null},"121":{"id":121,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":31.7},"122":{"id":122,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":31.6},"123":{"id":123,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":29.1},"124":{"id":124,"type":"decisao","feature":"Umi. Ins. (%)","feature_index":1,"threshold":96.5,"left":125,"right":152,"prediction":null},"125":{"id":125,"type":"decisao","feature":"Radiacao (KJ/m²)","feature_index":2,"threshold":696.8999938964844,"left":126,"right":145,"prediction":null},"126":{"id":126,"type":"decisao","feature":"Radiacao (KJ/m²)","feature_index":2,"threshold":62.34999990463257,"left":127,"right":132,"prediction":null},"127":{"id":127,"type":"decisao","feature":"Radiacao (KJ/m²)","feature_index":2,"threshold":6.349999904632568,"left":128,"right":131,"prediction":null},"128":{"id":128,"type":"decisao","feature":"Umi. Ins. (%)","feature_index":1,"threshold":94.5,"left":129,"right":130,"prediction":null},"129":{"id":129,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":28.5},"130":{"id":130,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":28.6},"131":{"id":131,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":28.7},"132":{"id":132,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":24.350000381469727,"left":133,"right":136,"prediction":null},"133":{"id":133,"type":"decisao","feature":"Radiacao (KJ/m²)","feature_index":2,"threshold":184.5,"left":134,"right":135,"prediction":null},"134":{"id":134,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":29.8},"135":{"id":135,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":29.7},"136":{"id":136,"type":"decisao","feature":"Radiacao (KJ/m²)","feature_index":2,"threshold":522.75,"left":137,"right":140,"prediction":null},"137":{"id":137,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":24.65000057220459,"left":138,"right":139,"prediction":null},"138":{"id":138,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":28.9},"139":{"id":139,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":28.8},"140":{"id":140,"type":"decisao","feature":"Radiacao (KJ/m²)","feature_index":2,"threshold":671.4499816894531,"left":141,"right":144,"prediction":null},"141":{"id":141,"type":"decisao","feature":"Radiacao (KJ/m²)","feature_index":2,"threshold":630.1499938964844,"left":142,"right":143,"prediction":null},"142":{"id":142,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":29.6},"143":{"id":143,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":29.4},"144":{"id":144,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":29.0},"145":{"id":145,"type":"decisao","feature":"Umi. Ins. (%)","feature_index":1,"threshold":93.5,"left":146,"right":147,"prediction":null},"146":{"id":146,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":29.3},"147":{"id":147,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":25.449999809265137,"left":148,"right":151,"prediction":null},"148":{"id":148,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":25.0,"left":149,"right":150,"prediction":null},"149":{"id":149,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":31.5},"150":{"id":150,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":31.4},"151":{"id":151,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":29.5},"152":{"id":152,"type":"decisao","feature":"Radiacao (KJ/m²)","feature_index":2,"threshold":9.25000023841858,"left":153,"right":172,"prediction":null},"153":{"id":153,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":23.65000057220459,"left":154,"right":163,"prediction":null},"154":{"id":154,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":22.90000057220459,"left":155,"right":158,"prediction":null},"155":{"id":155,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":22.65000057220459,"left":156,"right":157,"prediction":null},"156":{"id":156,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":30.9},"157":{"id":157,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":31.0},"158":{"id":158,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":23.199999809265137,"left":159,"right":160,"prediction":null},"159":{"id":159,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":30.8},"160":{"id":160,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":23.449999809265137,"left":161,"right":162,"prediction":null},"161":{"id":161,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":30.7},"162":{"id":162,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":30.6},"163":{"id":163,"type":"decisao","feature":"Radiacao (KJ/m²)","feature_index":2,"threshold":3.450000047683716,"left":164,"right":171,"prediction":null},"164":{"id":164,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":23.84999942779541,"left":165,"right":168,"prediction":null},"165":{"id":165,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":23.75,"left":166,"right":167,"prediction":null},"166":{"id":166,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":30.25},"167":{"id":167,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":30.35},"168":{"id":168,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":23.949999809265137,"left":169,"right":170,"prediction":null},"169":{"id":169,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":30.1},"170":{"id":170,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":30.2},"171":{"id":171,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":29.9},"172":{"id":172,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":23.15000057220459,"left":173,"right":174,"prediction":null},"173":{"id":173,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":31.1},"174":{"id":174,"type":"decisao","feature":"Temp. Ins. (C)","feature_index":0,"threshold":24.300000190734863,"left":175,"right":176,"prediction":null},"175":{"id":175,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":31.2},"176":{"id":176,"type":"folha","feature":"-","feature_index":-2,"threshold":null,"left":-1,"right":-1,"prediction":31.3}};
+const FEATURES = {"0": {"name": "Temperatura instantânea", "unit": "°C", "csv_name": "Temp. Ins. (C)"}, "1": {"name": "Umidade instantânea", "unit": "%", "csv_name": "Umi. Ins. (%)"}, "2": {"name": "Radiação solar", "unit": "kJ/m²", "csv_name": "Radiacao (KJ/m²)"}};
+const ROOT = document.getElementById('treeRoot');
+
+function fmt(v) {
+  return Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 8, useGrouping: false });
+}
+function renderNode(id) {
+  const n = NODES[String(id)];
+  if (n.type === 'folha') {
+    return `<div class="leaf" id="node-${n.id}" data-node="${n.id}">
+      <div class="leaf-top">FOLHA · NÓ ${n.id}</div>
+      <div class="leaf-value">${fmt(n.prediction)} °C</div>
+      <div class="leaf-note">Previsão final da árvore</div>
+    </div>`;
+  }
+  const feature = FEATURES[n.feature_index];
+  const condition = `${feature.name} (${feature.unit}) ≤ ${fmt(n.threshold)}?`;
+  const isRoot = n.id === 0;
+  return `<details class="node decision" id="node-${n.id}" data-node="${n.id}" ${isRoot ? 'open' : ''}>
+    <summary><span class="node-id">NÓ ${n.id}</span><span class="condition">${condition}</span></summary>
+    <div class="node-content">
+      <div class="children">
+        <div class="branch branch-yes">
+          <div class="branch-heading"><strong>SIM</strong><span>· ≤ ${fmt(n.threshold)}</span><span class="route">→ nó ${n.left}</span></div>
+          ${renderNode(n.left)}
+        </div>
+        <div class="branch branch-no">
+          <div class="branch-heading"><strong>NÃO</strong><span>· &gt; ${fmt(n.threshold)}</span><span class="route">→ nó ${n.right}</span></div>
+          ${renderNode(n.right)}
+        </div>
+      </div>
+    </div>
+  </details>`;
+}
+ROOT.innerHTML = renderNode(0);
+
+document.getElementById('expandAll').addEventListener('click', () => {
+  document.querySelectorAll('#treeRoot details.node').forEach(d => d.open = true);
+});
+document.getElementById('collapseAll').addEventListener('click', () => {
+  document.querySelectorAll('#treeRoot details.node').forEach(d => d.open = false);
+  const root = document.getElementById('node-0');
+  if (root) root.open = true;
+});
+function locateNode() {
+  const raw = document.getElementById('nodeSearch').value.trim();
+  const msg = document.getElementById('searchMessage');
+  if (raw === '') { msg.textContent = 'Digite o número de um nó.'; return; }
+  const id = Number(raw);
+  const target = document.getElementById(`node-${id}`);
+  if (!target) { msg.textContent = `Nó ${raw} não encontrado.`; return; }
+  let parent = target.parentElement;
+  while (parent && parent.id !== 'treeRoot') {
+    if (parent.tagName && parent.tagName.toLowerCase() === 'details') parent.open = true;
+    parent = parent.parentElement;
+  }
+  document.querySelectorAll('.highlight').forEach(el => el.classList.remove('highlight'));
+  target.classList.add('highlight');
+  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  msg.textContent = `Nó ${id} localizado.`;
+}
+document.getElementById('searchBtn').addEventListener('click', locateNode);
+document.getElementById('nodeSearch').addEventListener('keydown', e => { if (e.key === 'Enter') locateNode(); });
+
+document.getElementById('tableSearch').addEventListener('input', e => {
+  const q = e.target.value.toLocaleLowerCase('pt-BR');
+  document.querySelectorAll('#nodesTable tbody tr').forEach(tr => {
+    tr.style.display = tr.textContent.toLocaleLowerCase('pt-BR').includes(q) ? '' : 'none';
+  });
+});
+</script>
+</body>
+</html>
